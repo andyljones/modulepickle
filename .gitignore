@@ -1,0 +1,14 @@
+.env
+.vscode
+output
+__pycache__
+credentials.json
+.cache
+data
+.~lock*
+.ipynb_checkpoints
+.logs
+logs
+runs
+credentials
+*.egg-info
