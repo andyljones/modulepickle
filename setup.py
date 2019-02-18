@@ -6,5 +6,4 @@ setup(name='modulepickle',
       author='Andy Jones',
       author_email='andyjones.ed@gmail.com',
       url='https://github.com/andyljones/modulepickle',
-      packages=['modulepickle'],
-     )
+      packages=['modulepickle'])

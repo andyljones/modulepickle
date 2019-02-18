@@ -1,11 +1,17 @@
 from pathlib import Path
 from pkg_resources import resource_filename
 import shutil
+from io import BytesIO
 
 import docker
 from cloudpickle import CloudPickler
 
 from . import pickler
+
+def dump(f):
+    bs = BytesIO()
+    pickler(CloudPickler)(bs).dump(f)
+    return bs.getvalue()
 
 def test(f):
     """Run `docker build -t modulepickle .` to create the image this needs
@@ -22,6 +28,8 @@ def test(f):
         
     modulepickle.test.test(f)
     ```
+
+    If it fails, turn the logging level down to DEBUG and check that `other` is in your working directory
 
     """
     client = docker.from_env()

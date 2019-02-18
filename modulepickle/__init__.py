@@ -6,6 +6,9 @@ import tempfile
 import importlib.machinery
 import hashlib
 import sys
+from logging import getLogger
+
+log = getLogger(__name__)
 
 __all__ = ('pickler',)
 
@@ -36,8 +39,8 @@ class Package(object):
 
     def load(self, modulename):
         # If the module is missing, or if it's hash is old
-        print(f'Loading {modulename}')
         if (modulename not in sys.modules) or (sys.modules[modulename].__packagehash__ != self.hash):
+            log.debug(f'Loading code of {modulename}')
             path = self.extract()
 
             # Following `https://docs.python.org/3/reference/import.html#loading`
@@ -59,7 +62,6 @@ def compress(packagename):
     return Package(packagename, tar.getvalue())
 
 def import_compressed(modulename, package):
-    print(f'Importing {modulename}')
     return package.load(modulename)
 
 def pickler(base):
@@ -83,16 +85,18 @@ def pickler(base):
             return self.packages[package]
 
         def save_module(self, obj):
-            print(f'Saving module {obj}')
 
             # If the module isn't in the current working directory, use the default implementation
             path = getattr(obj, '__file__', '')
             if not path.startswith(os.getcwd()):
+                log.debug(f'Saving reference only of {obj.__name__}')
                 return super().save_module(obj)
+            log.debug(f'Saving code of {obj.__name__}')
 
             # Otherwise the package we want to zip up is the first part of the module name
             #TODO: Check this holds on relative imports
             package = obj.__name__.split('.')[0]
+
 
             args = (obj.__name__, self.compress_package(package))
             self.save_reduce(import_compressed, args, obj=obj)
