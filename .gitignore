@@ -12,3 +12,5 @@ logs
 runs
 credentials
 *.egg-info
+MANIFEST
+dist

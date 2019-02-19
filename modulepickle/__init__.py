@@ -1,3 +1,8 @@
+"""
+## TODO
+  * Import parents
+  * Change to a parallel sys.modules
+"""
 import os
 import types
 from io import BytesIO
@@ -6,6 +11,7 @@ import tempfile
 import importlib.machinery
 import hashlib
 import sys
+import re
 from logging import getLogger
 
 log = getLogger(__name__)
@@ -45,6 +51,7 @@ class Package(object):
 
             # Following `https://docs.python.org/3/reference/import.html#loading`
             spec = self.finder.find_spec(modulename, [path])
+            print(os.listdir(path + '/drones/practice/'), flush=True)
             module = types.ModuleType(spec.name)
             importlib._bootstrap._init_module_attrs(spec, module)
             module.__packagehash__ = self.hash
@@ -86,9 +93,11 @@ def pickler(base):
 
         def save_module(self, obj):
 
-            # If the module isn't in the current working directory, use the default implementation
+            # If the module isn't in the current working directory, 
+            # or module has site-packages in it's path (to exclude local envs)
+            # use the default implementation
             path = getattr(obj, '__file__', '')
-            if not path.startswith(os.getcwd()):
+            if (not path.startswith(os.getcwd())) or ('site-packages' in path):
                 log.debug(f'Saving reference only of {obj.__name__}')
                 return super().save_module(obj)
             log.debug(f'Saving code of {obj.__name__}')

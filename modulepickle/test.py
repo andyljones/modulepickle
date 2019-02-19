@@ -13,7 +13,7 @@ def dump(f):
     pickler(CloudPickler)(bs).dump(f)
     return bs.getvalue()
 
-def test(f):
+def test(f, image='modulepickle', base=CloudPickler):
     """Run `docker build -t modulepickle .` to create the image this needs
     
     This'll create a docker container, copy the pickling code into it, and then ask it to 
@@ -41,12 +41,12 @@ def test(f):
     shutil.copy2(resource_filename(__package__, '__init__.py'), path / __package__ / '__init__.py')
 
     with (path / 'f.pkl').open('wb') as pkl:
-        pickler(CloudPickler)(pkl).dump(f)
+        pickler(base)(pkl).dump(f)
 
     command = """python -c "import pickle; pickle.load(open('/host/f.pkl', 'rb'))()" """
     volume = {str(path): {'bind': '/host', 'mode': 'rw'}}
     try:
-        container = client.containers.create('modulepickle', command, volumes=volume, working_dir='/host')
+        container = client.containers.create(image, command, volumes=volume, working_dir='/host')
         container.start()
         logs = container.logs(stdout=True, stderr=True, stream=True, follow=True)
         code = container.wait()['StatusCode']
