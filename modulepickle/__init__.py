@@ -44,7 +44,7 @@ class Package():
     def extract(self):
         # Salt the temp directory with the hashcode of the compressed dir, so that when the next copy of it comes down the line,
         #  we can either reuse the existing dir if it's the same, or point ourselves at a new one if it isn't.
-        dirpath = tempfile.mkdtemp(prefix=f'{TEMPDIR_ID}-{self.name}-{self.hashcode}-')
+        dirpath = tempfile.mkdtemp(prefix=f'{TEMPDIR_ID}-{self.name}-{self.md5}-')
         bs = BytesIO(self.compressed)
         with TarFile(fileobj=bs) as tf:
             tf.extractall(os.path.join(dirpath))
