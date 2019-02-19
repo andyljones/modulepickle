@@ -13,63 +13,76 @@ import hashlib
 import sys
 import re
 from logging import getLogger
+from collections import namedtuple
 
 log = getLogger(__name__)
 
 __all__ = ('pickler',)
+
+LOADERS = {}
 
 def md5(compressed):
     md5 = hashlib.md5()
     md5.update(compressed)
     return md5.digest()
 
-class Package(object):
-
-    def __init__(self, name, compressed):
-        self.name, self.compressed = name, compressed
-        self.hash = md5(compressed)
-        self.extracted = False
-        self.finder = None
-        self.path = None
-
-    def extract(self):
-        if self.path is None:
-            dirpath = tempfile.mkdtemp()
-            bs = BytesIO(self.compressed)
-            with TarFile(fileobj=bs) as tf:
-                tf.extractall(os.path.join(dirpath, self.name))
-
-            self.finder = importlib.machinery.PathFinder()
-            self.path = dirpath
-        return self.path
-
-    def load(self, modulename):
-        # If the module is missing, or if it's hash is old
-        if (modulename not in sys.modules) or (sys.modules[modulename].__packagehash__ != self.hash):
-            log.debug(f'Loading code of {modulename}')
-            path = self.extract()
-
-            # Following `https://docs.python.org/3/reference/import.html#loading`
-            spec = self.finder.find_spec(modulename, [path])
-            print(os.listdir(path + '/drones/practice/'), flush=True)
-            module = types.ModuleType(spec.name)
-            importlib._bootstrap._init_module_attrs(spec, module)
-            module.__packagehash__ = self.hash
-            sys.modules[modulename] = module
-            spec.loader.exec_module(module)
-
-        return sys.modules[modulename]
+def extract(compressed):
+    dirpath = tempfile.mkdtemp()
+    bs = BytesIO(compressed)
+    with TarFile(fileobj=bs) as tf:
+        tf.extractall(os.path.join(dirpath))
+    return dirpath
 
 def compress(packagename):
     tar = BytesIO()
     with TarFile(fileobj=tar, mode='w') as tf:
-        tf.add(packagename, '')
+        tf.add(packagename, packagename)
     #TODO: This was originally gzipped, but the gzipped value seems to change on repeated compressions, breaking hashing.
     # Looks like the issue is a timestamp that can be overriden with a parameter, but let's leave it uncompressed for now.
-    return Package(packagename, tar.getvalue())
+    return tar.getvalue()
+
+class Loader():
+
+    def __init__(self, compressed):
+        self.root = extract(compressed)
+        self.modules = {}
+        self.finder = importlib.machinery.PathFinder()
+
+    def load(self, name):
+        """This largely follows `importlib._bootstrap._find_and_load_unlocked`. 
+        There's a high level description [here](https://docs.python.org/3/reference/import.html#loading)"""
+        if name in self.modules:
+            return self.modules[name]
+
+        (parentname, _, modulename) = name.rpartition('.')
+        if parentname:
+            path = self.load(parentname).__path__ 
+            # Sometimes importing the parent can, as a side-effect, bring in the children.
+            if name in self.modules:
+                return self.modules[name]
+        else:
+            path = self.root
+        
+        # Because our specs always come from the PathLoader, we can take some shortcuts here
+        spec = self.finder.find_spec(modulename, [path])
+        module = types.ModuleType(spec.name)
+        importlib._bootstrap._init_module_attrs(spec, module)
+
+        original = sys.modules
+        sys.modules = {**sys.modules, **self.modules}
+        spec.loader.exec_module(module)
+        sys.modules = original
+
+        self.modules[name] = module
+
+        return module
+
+Package = namedtuple('Package', ('hash', 'compressed'))
 
 def import_compressed(modulename, package):
-    return package.load(modulename)
+    if package.hash not in LOADERS:
+        LOADERS[package.hash] = Loader(package.compressed)
+    return LOADERS[package.hash].load(modulename)
 
 def pickler(base):
     """Create a Pickler that can pickle packages by inheriting from `base`
@@ -86,13 +99,13 @@ def pickler(base):
             super().__init__(*args, **kwargs)
             self.packages = {}
 
-        def compress_package(self, package):
-            if package not in self.packages:
-                self.packages[package] = compress(package)
-            return self.packages[package]
+        def compress_package(self, packagename):
+            if packagename not in self.packages:
+                compressed = compress(packagename)
+                self.packages[packagename] = Package(md5(compressed), compressed)
+            return self.packages[packagename]
 
         def save_module(self, obj):
-
             # If the module isn't in the current working directory, 
             # or module has site-packages in it's path (to exclude local envs)
             # use the default implementation
@@ -104,10 +117,9 @@ def pickler(base):
 
             # Otherwise the package we want to zip up is the first part of the module name
             #TODO: Check this holds on relative imports
-            package = obj.__name__.split('.')[0]
+            packagename = obj.__name__.split('.')[0]
 
-
-            args = (obj.__name__, self.compress_package(package))
+            args = (obj.__name__, self.compress_package(packagename))
             self.save_reduce(import_compressed, args, obj=obj)
         dispatch[types.ModuleType] = save_module
     
