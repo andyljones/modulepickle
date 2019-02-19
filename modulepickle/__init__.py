@@ -20,18 +20,19 @@ log = getLogger(__name__)
 
 __all__ = ('pickler',)
 
-LOADERS = {}
+TEMPDIR_ID = 'MODULEPICKLE'
 
 def md5(compressed):
     md5 = hashlib.md5()
     md5.update(compressed)
-    return md5.digest()
+    return md5.hexdigest()[:16]
 
-def extract(compressed):
-    dirpath = tempfile.mkdtemp()
+def extract(hashcode, compressed):
+    dirpath = tempfile.mkdtemp(prefix=f'{TEMPDIR_ID}-{hashcode}-')
     bs = BytesIO(compressed)
     with TarFile(fileobj=bs) as tf:
         tf.extractall(os.path.join(dirpath))
+    print(dirpath)
     return dirpath
 
 def compress(packagename):
@@ -42,29 +43,36 @@ def compress(packagename):
     # Looks like the issue is a timestamp that can be overriden with a parameter, but let's leave it uncompressed for now.
     return tar.getvalue()
 
-class Loader():
+def invalidate_caches():
+    for k, v in sys.modules.items():
+        filepath = getattr(v, '__file__', '') or ''
+        if TEMPDIR_ID in filepath:
+            del sys.modules[k]
+    importlib.invalidate_caches()
+
+def uninstall():
+    sys.path = [p for p in sys.path if TEMPDIR_ID not in p]
+
+class Package():
 
     def __init__(self, compressed):
-        self.root = extract(compressed)
+        self.compressed = compressed
+        self.md5 = md5(compressed)
 
-        self.original_modules = sys.modules.copy()
-        self.modules = self.original_modules.copy()
+    def install(self):
+        if any(self.md5 in p for p in sys.path):
+            return 
 
-        self.original_path = sys.path.copy()
-        self.path = self.original_path + [self.root]
+        uninstall()
+        invalidate_caches()
+        sys.path.append(extract(self.md5, self.compressed))
 
     def load(self, name):
-        sys.path = self.path
-        module = importlib.import_module(name)
-        sys.path = self.original_path
-        return module
+        self.install()
+        return importlib.import_module(name)
 
-Package = namedtuple('Package', ('hash', 'compressed'))
-
-def import_compressed(modulename, package):
-    if package.hash not in LOADERS:
-        LOADERS[package.hash] = Loader(package.compressed)
-    return LOADERS[package.hash].load(modulename)
+def import_compressed(name, package):
+    return package.load(name)
 
 def pickler(base):
     """Create a Pickler that can pickle packages by inheriting from `base`
@@ -84,7 +92,7 @@ def pickler(base):
         def compress_package(self, packagename):
             if packagename not in self.packages:
                 compressed = compress(packagename)
-                self.packages[packagename] = Package(md5(compressed), compressed)
+                self.packages[packagename] = Package(compressed)
             return self.packages[packagename]
 
         def save_module(self, obj):
