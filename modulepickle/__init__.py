@@ -1,8 +1,3 @@
-"""
-## TODO
-  * Import parents
-  * Change to a parallel sys.modules
-"""
 import os
 import types
 from io import BytesIO
@@ -12,13 +7,11 @@ import importlib
 import importlib.machinery
 import hashlib
 import sys
-import re
 from logging import getLogger
-from collections import namedtuple
 
 log = getLogger(__name__)
 
-__all__ = ('pickler',)
+__all__ = ('extend',)
 
 TEMPDIR_ID = 'MODULEPICKLE'
 
@@ -32,7 +25,6 @@ def extract(hashcode, compressed):
     bs = BytesIO(compressed)
     with TarFile(fileobj=bs) as tf:
         tf.extractall(os.path.join(dirpath))
-    print(dirpath)
     return dirpath
 
 def compress(packagename):
@@ -74,7 +66,7 @@ class Package():
 def import_compressed(name, package):
     return package.load(name)
 
-def pickler(base):
+def extend(base):
     """Create a Pickler that can pickle packages by inheriting from `base`
     
     We're dynamically inheriting from `base` here because my principal use case is extending ray's pickler, and ray's 
