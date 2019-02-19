@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name='modulepickle',
-      version='0.2',
+      version='0.3',
       description='Dynamic module pickler',
       author='Andy Jones',
       author_email='andyjones.ed@gmail.com',
