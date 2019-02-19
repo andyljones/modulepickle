@@ -30,9 +30,11 @@ def test(f, image='modulepickle', pickler=None):
     client = docker.from_env()
 
     path = Path('output/pickle').absolute()
-    (path / __package__).mkdir(exist_ok=True, parents=True)
+    if path.exists():
+        shutil.rmtree(path, ignore_errors=True)
 
     # Copy the pickling code in - needed so it can find the things we passed to __reduce__
+    (path / __package__).mkdir(exist_ok=True, parents=True)
     shutil.copy2(resource_filename(__package__, '__init__.py'), path / __package__ / '__init__.py')
 
     pickler = pickler or extend(CloudPickler)
@@ -49,7 +51,6 @@ def test(f, image='modulepickle', pickler=None):
     finally:
         container.stop()
         container.remove()
-        shutil.rmtree(path)
 
     result = 'passed' if code == 0 else 'failed' 
     output = ''.join(f'\t{l.decode()}' for l in logs)

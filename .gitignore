@@ -14,4 +14,3 @@ credentials
 *.egg-info
 MANIFEST
 dist
-_test.py
