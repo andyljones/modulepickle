@@ -8,6 +8,7 @@ import types
 from io import BytesIO
 from tarfile import TarFile
 import tempfile
+import importlib
 import importlib.machinery
 import hashlib
 import sys
@@ -45,36 +46,17 @@ class Loader():
 
     def __init__(self, compressed):
         self.root = extract(compressed)
-        self.modules = {}
-        self.finder = importlib.machinery.PathFinder()
+
+        self.original_modules = sys.modules.copy()
+        self.modules = self.original_modules.copy()
+
+        self.original_path = sys.path.copy()
+        self.path = self.original_path + [self.root]
 
     def load(self, name):
-        """This largely follows `importlib._bootstrap._find_and_load_unlocked`. 
-        There's a high level description [here](https://docs.python.org/3/reference/import.html#loading)"""
-        if name in self.modules:
-            return self.modules[name]
-
-        (parentname, _, modulename) = name.rpartition('.')
-        if parentname:
-            path = self.load(parentname).__path__ 
-            # Sometimes importing the parent can, as a side-effect, bring in the children.
-            if name in self.modules:
-                return self.modules[name]
-        else:
-            path = self.root
-        
-        # Because our specs always come from the PathLoader, we can take some shortcuts here
-        spec = self.finder.find_spec(modulename, [path])
-        module = types.ModuleType(spec.name)
-        importlib._bootstrap._init_module_attrs(spec, module)
-
-        original = sys.modules
-        sys.modules = {**sys.modules, **self.modules}
-        spec.loader.exec_module(module)
-        sys.modules = original
-
-        self.modules[name] = module
-
+        sys.path = self.path
+        module = importlib.import_module(name)
+        sys.path = self.original_path
         return module
 
 Package = namedtuple('Package', ('hash', 'compressed'))
