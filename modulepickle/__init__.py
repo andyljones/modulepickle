@@ -9,9 +9,9 @@ import hashlib
 import sys
 from logging import getLogger
 
-log = getLogger(__name__)
-
 __all__ = ('extend',)
+
+log = getLogger(__name__)
 
 TEMPDIR_ID = 'MODULEPICKLE'
 
