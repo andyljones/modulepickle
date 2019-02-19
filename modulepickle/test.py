@@ -8,7 +8,7 @@ from cloudpickle import CloudPickler
 
 from . import extend
 
-def test(f, image='modulepickle', base=CloudPickler):
+def test(f, image='modulepickle', pickler=None):
     """Run `docker build -t modulepickle .` to create the image this needs
     
     This'll create a docker container, copy the pickling code into it, and then ask it to 
@@ -35,8 +35,9 @@ def test(f, image='modulepickle', base=CloudPickler):
     # Copy the pickling code in - needed so it can find the things we passed to __reduce__
     shutil.copy2(resource_filename(__package__, '__init__.py'), path / __package__ / '__init__.py')
 
+    pickler = pickler or extend(CloudPickler)
     with (path / 'f.pkl').open('wb') as pkl:
-        extend(base)(pkl).dump(f)
+        pickler(pkl).dump(f)
 
     command = """python -c "import pickle; pickle.load(open('/host/f.pkl', 'rb'))()" """
     volume = {str(path): {'bind': '/host', 'mode': 'rw'}}
