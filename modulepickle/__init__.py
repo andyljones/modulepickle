@@ -30,7 +30,9 @@ class Package():
     def invalidate_caches(self):
         # Chuck out any modules that come from one of our temp dirs, so that when they get importer next time it's imported from
         # the shiny new temp dir
-        for k, v in sys.modules.items():
+        modules = list(sys.modules)
+        for k in modules:
+            v = modules[k]
             filepath = getattr(v, '__file__', '') or ''
             if f'{TEMPDIR_ID}-{self.name}-' in filepath:
                 del sys.modules[k]
