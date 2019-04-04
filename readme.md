@@ -1,3 +1,5 @@
+**This is not yet stable**
+
 modulepickle extends [cloudpickle](https://github.com/cloudpipe/cloudpickle) and adds support for pickling whole packages from your working directory. This is useful when you're developing those modules and don't want to manually ship them out every time you make a remote function call.
 
 **WARNING: If your code defers it's imports - if there are import statements hidden inside functions - you risk [nasal demons](http://www.catb.org/jargon/html/N/nasal-demons.html).**
