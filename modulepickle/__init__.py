@@ -32,7 +32,7 @@ class Package():
         # the shiny new temp dir
         modules = list(sys.modules)
         for k in modules:
-            v = modules[k]
+            v = sys.modules[k]
             filepath = getattr(v, '__file__', '') or ''
             if f'{TEMPDIR_ID}-{self.name}-' in filepath:
                 del sys.modules[k]
